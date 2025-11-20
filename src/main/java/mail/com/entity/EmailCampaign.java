@@ -25,6 +25,8 @@ public class EmailCampaign {
     @Column(name = "delay_seconds")
     private Integer delaySeconds;
 
+    private String attachmentPath;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -102,5 +104,13 @@ public class EmailCampaign {
 
     public void setCreatedBy(User createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public String getAttachmentPath() {
+        return attachmentPath;
+    }
+
+    public void setAttachmentPath(String attachmentPath) {
+        this.attachmentPath = attachmentPath;
     }
 }

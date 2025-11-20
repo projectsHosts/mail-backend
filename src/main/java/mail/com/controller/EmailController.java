@@ -16,10 +16,17 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.Principal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -53,7 +60,8 @@ public class EmailController {
             @RequestParam("subject") String subject,
             @RequestParam("body") String body,
             @RequestParam(value = "delaySeconds", defaultValue = "0") Integer delaySeconds,
-            @RequestParam("getCreatedBy") String createdBy  ) {
+            @RequestParam("getCreatedBy") String createdBy,
+            @RequestPart(value = "attachment", required = false) MultipartFile attachment) {
 
         try {
 
@@ -84,6 +92,18 @@ public class EmailController {
             User user = userRepository.findByEmail(createdBy)
                     .orElseThrow(() -> new RuntimeException("User not found"));
             campaign.setCreatedBy(user);
+
+            // handle attachment optional
+            if (attachment != null && !attachment.isEmpty()) {
+                // validate type & size
+                String attType = attachment.getContentType();
+                if (!isAllowedAttachment(attType)) {
+                    return ResponseEntity.badRequest().body("Attachment must be PDF/DOC/DOCX");
+                }
+                // save file to disk (or S3) and set path
+                String savedPath = saveAttachmentToDisk(attachment);
+                campaign.setAttachmentPath(savedPath);
+            }
 
             // Associate recipients with campaign
             for (EmailRecipient recipient : recipients) {
@@ -193,5 +213,26 @@ public class EmailController {
     }
 
 
+
+    private boolean isAllowedAttachment(String contentType) {
+        return contentType != null && (contentType.equals("application/pdf")
+                || contentType.equals("application/msword")
+                || contentType.equals("application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
+    }
+
+    private String saveAttachmentToDisk(MultipartFile file) throws IOException {
+        // choose folder (configurable)
+        String uploadsDir = "/var/app/uploads/attachments"; // or use application.properties path
+        Files.createDirectories(Paths.get(uploadsDir));
+
+        String original = file.getOriginalFilename();
+        String ext = original != null && original.contains(".") ? original.substring(original.lastIndexOf(".")) : "";
+        String filename = UUID.randomUUID().toString() + ext;
+        Path dest = Paths.get(uploadsDir, filename);
+        try (InputStream is = file.getInputStream()) {
+            Files.copy(is, dest, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return dest.toString(); // store absolute path or relative path as needed
+    }
 
 }

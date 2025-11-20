@@ -19,6 +19,7 @@ public class BulkEmailService {
 
     @Async
     public void sendBulkEmails(EmailCampaign campaign) {
+        String attachmentPath = campaign.getAttachmentPath();
         campaign.getRecipients().forEach(recipient -> {
             try {
                 // Apply delay between emails
@@ -29,7 +30,8 @@ public class BulkEmailService {
                 boolean sent = emailService.sendEmail(
                         recipient.getEmail(),
                         campaign.getSubject(),
-                        campaign.getBody()
+                        campaign.getBody(),
+                        attachmentPath
                 );
 
                 if (sent) {
