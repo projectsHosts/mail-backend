@@ -3,6 +3,8 @@ package mail.com.controller;
 import mail.com.dto.EmailResponse;
 import mail.com.entity.EmailCampaign;
 import mail.com.entity.EmailRecipient;
+import mail.com.loginDetails.model.User;
+import mail.com.loginDetails.repo.UserRepository;
 import mail.com.repository.EmailCampaignRepository;
 import mail.com.repository.EmailRecipientRepository;
 import mail.com.service.BulkEmailService;
@@ -14,6 +16,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +31,9 @@ public class EmailController {
     private EmailCampaignRepository campaignRepository;
     @Autowired
     private JavaMailSender mailSender;
+
+    @Autowired
+    private UserRepository userRepository;
 
 
     @Autowired
@@ -46,12 +52,10 @@ public class EmailController {
             @RequestParam("name") String campaignName,
             @RequestParam("subject") String subject,
             @RequestParam("body") String body,
-            @RequestParam(value = "delaySeconds", defaultValue = "0") Integer delaySeconds) {
+            @RequestParam(value = "delaySeconds", defaultValue = "0") Integer delaySeconds,
+            @RequestParam("getCreatedBy") String createdBy  ) {
 
         try {
-            System.out.println("Received file: " + file.getOriginalFilename());
-            System.out.println("File size: " + file.getSize());
-            System.out.println("Campaign name: " + campaignName);
 
             // Check if file is empty
             if (file.isEmpty()) {
@@ -77,6 +81,9 @@ public class EmailController {
             campaign.setSubject(subject);
             campaign.setBody(body);
             campaign.setDelaySeconds(delaySeconds);
+            User user = userRepository.findByEmail(createdBy)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            campaign.setCreatedBy(user);
 
             // Associate recipients with campaign
             for (EmailRecipient recipient : recipients) {
@@ -112,15 +119,19 @@ public class EmailController {
 
     // ... rest of the methods remain same
     @PostMapping("/campaign/{campaignId}/send")
-    public ResponseEntity<?> sendCampaign(@PathVariable Long campaignId) {
+    public ResponseEntity<?> sendCampaign(@PathVariable Long campaignId, Principal principal) {
         try {
             System.out.println("Send campaign called for ID: " + campaignId);
 
             EmailCampaign campaign = campaignRepository.findById(campaignId)
                     .orElseThrow(() -> new RuntimeException("Campaign not found"));
 
+//            String fromEmail = principal.getName();
+
+//            System.out.println("Check here..... "+fromEmail);
             // ✅ ACTUALLY SEND EMAILS - ADD THIS LINE
             bulkEmailService.sendBulkEmails(campaign);
+
             // ✅ Return JSON (NOT plain text)
             Map<String, String> response = new HashMap<>();
             response.put("message", "Email sending started successfully!");
@@ -168,10 +179,19 @@ public class EmailController {
 //        }
 //    }
 
+//    @GetMapping("/campaigns")
+//    public List<EmailCampaign> getCampaigns() {
+//        return campaignRepository.findAllByOrderByCreatedAtDesc();
+//    }
+
     @GetMapping("/campaigns")
-    public List<EmailCampaign> getCampaigns() {
-        return campaignRepository.findAllByOrderByCreatedAtDesc();
+    public ResponseEntity<?> getCampaigns(@RequestParam("email") String email) {
+        List<EmailCampaign> campaigns =
+                campaignRepository.findByCreatedByEmailOrderByCreatedAtDesc(email);
+
+        return ResponseEntity.ok(campaigns);
     }
+
 
 
 }

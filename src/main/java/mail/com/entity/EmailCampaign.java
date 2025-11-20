@@ -3,6 +3,7 @@ package mail.com.entity;
 
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
+import mail.com.loginDetails.model.User;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,6 +31,10 @@ public class EmailCampaign {
     @OneToMany(mappedBy = "campaign", cascade = CascadeType.ALL)
     @JsonManagedReference
     private List<EmailRecipient> recipients = new ArrayList<>();
+
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User createdBy;
 
     public EmailCampaign() {
         this.createdAt = LocalDateTime.now();
@@ -89,5 +94,13 @@ public class EmailCampaign {
 
     public void setRecipients(List<EmailRecipient> recipients) {
         this.recipients = recipients;
+    }
+
+    public User getCreatedBy() {
+        return createdBy;
+    }
+
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
     }
 }
